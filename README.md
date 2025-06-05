@@ -55,7 +55,7 @@ You can also open issues to report bugs or suggest new features.
 
 ## 📄 License
 
-This project is licensed under the [Mozila 2.0] License.
+This project is licensed under the [Mozilla Public License Version 2.0](LICENSE) License.
 
 ---
 

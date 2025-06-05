@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom styles for color coding */
+        .income-row { background-color: #d1fae5; border-left: 4px solid #10b981; }
+        .fixed-expense-row { background-color: #fee2e2; border-left: 4px solid #ef4444; }
+        .variable-expense-row { background-color: #fce7f3; border-left: 4px solid #ec4899; }
+        .shared-row { border-right: 4px solid #f97316; } /* Example for shared */
+        .not-shared-row { border-right: 4px solid #a855f7; } /* Example for not shared */
+
+        .dark .income-row { background-color: #064e3b; border-left-color: #10b981; }
+        .dark .fixed-expense-row { background-color: #7f1d1d; border-left-color: #ef4444; }
+        .dark .variable-expense-row { background-color: #831843; border-left-color: #ec4899; }
+        .dark .shared-row { border-right-color: #f97316; }
+        .dark .not-shared-row { border-right-color: #a855f7; }
+
+        /* Modal styles */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 600px; border-radius: 0.5rem; }
+        .dark .modal-content { background-color: #1f2937; border-color: #4b5563; }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        .dark .close-button { color: #9ca3af; }
+        .dark .close-button:hover, .dark .close-button:focus { color: #e5e7eb; }
+
+        /* Language toggle switch */
+        .lang-label { display: inline-block; width: auto; text-align: center; padding: 0 0.5rem; }
+        .lang-toggle-label { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .lang-toggle-label input { opacity: 0; width: 0; height: 0; }
+        .lang-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .lang-slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .lang-slider { background-color: #4f46e5; }
+        input:checked + .lang-slider:before { transform: translateX(26px); }
+
+        /* Ensure select dropdowns are visible in dark mode */
+        .dark select { background-color: #374151; color: #e5e7eb; border-color: #4b5563; }
+        .dark select option { background-color: #374151; color: #e5e7eb; }
+
+        /* Responsive table */
+        @media screen and (max-width: 768px) {
+            .transaction-table th, .transaction-table td {
+                padding: 0.5rem 0.25rem; /* Smaller padding on mobile */
+                font-size: 0.8rem; /* Smaller font on mobile */
+            }
+            .transaction-table th:nth-child(5), /* Method */
+            .transaction-table td:nth-child(5),
+            .transaction-table th:nth-child(7), /* Notes */
+            .transaction-table td:nth-child(7) {
+                display: none; /* Hide less critical columns on small screens */
+            }
+        }
+        #aiAnalysisResult pre {
+            white-space: pre-wrap; /* Ensures text wraps within the pre tag */
+            word-wrap: break-word; /* Breaks long words to prevent overflow */
+            background-color: #f0f9ff; /* Light blue background */
+            padding: 1rem;
+            border-radius: 0.375rem; /* rounded-md */
+            border: 1px solid #e0f2fe; /* Light blue border */
+            color: #0c4a6e; /* Dark blue text */
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1.5;
+        }
+        .dark #aiAnalysisResult pre {
+            background-color: #1e3a8a; /* Darker blue for dark mode */
+            border-color: #3b82f6;
+            color: #bfdbfe; /* Lighter blue text for dark mode */
+        }
+        .ai-button {
+            background-color: #2dd4bf; /* teal-400 */
+            color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 0.375rem; /* rounded-md */
+            font-size: 0.75rem; /* text-xs */
+            transition: background-color 0.2s;
+            border: none;
+        }
+        .ai-button:hover {
+            background-color: #14b8a6; /* teal-500 */
+        }
+        .ai-button:disabled {
+            background-color: #94a3b8; /* slate-400 */
+            cursor: not-allowed;
+        }
+        .ai-button i { margin-right: 0.25rem; }
+        #apiKeySavedMessage, #currencySavedMessage {
+            transition: opacity 0.5s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
+    <div class="container mx-auto px-2 sm:px-4 py-8">
+        <!-- Header and Language Toggle -->
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+            <h1 class="text-2xl sm:text-3xl font-bold text-center sm:text-left" data-lang-en="Financial Dashboard" data-lang-he="לוח בקרה פיננסי">Financial Dashboard</h1>
+            
+            <div class="flex items-center space-x-2">
+                <span class="lang-label text-sm" data-lang-en="EN" data-lang-he="EN">EN</span>
+                <label class="lang-toggle-label">
+                    <input type="checkbox" id="langToggle">
+                    <span class="lang-slider"></span>
+                </label>
+                <span class="lang-label text-sm" data-lang-en="HE" data-lang-he="עב">HE</span>
+                
+                <button id="themeToggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    <i class="fas fa-moon text-gray-700 dark:text-gray-300 dark:hidden"></i>
+                    <i class="fas fa-sun text-gray-700 dark:text-gray-300 hidden dark:block"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Dashboard Filters -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium mb-1" data-lang-en="Month" data-lang-he="חודש">Month</label>
+                    <select id="filterMonth" class="w-full p-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500">
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1" data-lang-en="Payment Method" data-lang-he="אמצעי תשלום">Payment Method</label>
+                    <select id="filterPaymentMethod" class="w-full p-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="all" data-lang-en="All Methods" data-lang-he="כל האמצעים">All Methods</option>
+                        <option value="Credit Card" data-lang-en="Credit Card" data-lang-he="כרטיס אשראי">Credit Card</option>
+                        <option value="Bank Transfer" data-lang-en="Bank Transfer" data-lang-he="העברה בנקאית">Bank Transfer</option>
+                        <option value="Cash" data-lang-en="Cash" data-lang-he="מזומן">Cash</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1" data-lang-en="Category" data-lang-he="קטגוריה">Category</label>
+                    <select id="filterCategory" class="w-full p-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="all" data-lang-en="All Categories" data-lang-he="כל הקטגוריות">All Categories</option>
+                        <!-- Income Categories -->
+                        <optgroup label="Income" data-lang-en-label="Income" data-lang-he-label="הכנסות">
+                            <option value="Salary" data-lang-en="Salary" data-lang-he="משכורת">Salary</option>
+                            <option value="Freelance" data-lang-en="Freelance" data-lang-he="פרילנס">Freelance</option>
+                            <option value="Investments" data-lang-en="Investments" data-lang-he="השקעות">Investments</option>
+                             <option value="Gift Income" data-lang-en="Gift" data-lang-he="מתנה">Gift</option>
+                        </optgroup>
+                        <!-- Fixed Expense Categories -->
+                        <optgroup label="Fixed Expenses" data-lang-en-label="Fixed Expenses" data-lang-he-label="הוצאות קבועות">
+                            <option value="Rent" data-lang-en="Rent" data-lang-he="שכירות">Rent</option>
+                            <option value="Utilities" data-lang-en="Utilities" data-lang-he="חשבונות">Utilities</option>
+                            <option value="Gym" data-lang-en="Gym" data-lang-he="חדר כושר">Gym</option>
+                            <option value="Insurance" data-lang-en="Insurance" data-lang-he="ביטוח">Insurance</option>
+                        </optgroup>
+                        <!-- Variable Expense Categories -->
+                        <optgroup label="Variable Expenses" data-lang-en-label="Variable Expenses" data-lang-he-label="הוצאות משתנות">
+                            <option value="Restaurants" data-lang-en="Restaurants" data-lang-he="מסעדות">Restaurants</option>
+                            <option value="Groceries" data-lang-en="Groceries" data-lang-he="מצרכים">Groceries</option>
+                            <option value="Entertainment" data-lang-en="Entertainment" data-lang-he="בידור">Entertainment</option>
+                            <option value="Shopping" data-lang-en="Shopping" data-lang-he="קניות">Shopping</option>
+                            <option value="Transport" data-lang-en="Transport" data-lang-he="תחבורה">Transport</option>
+                            <option value="Gifts Expense" data-lang-en="Gifts" data-lang-he="מתנות">Gifts</option>
+                        </optgroup>
+                    </select>
+                </div>
+                
+                <button id="applyFiltersBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition" data-lang-en="Apply Filters" data-lang-he="החל מסננים">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+
+        <!-- Cash Flow Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-b-4 border-green-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase" data-lang-en="Income" data-lang-he="הכנסות">Income</h3>
+                        <p id="summaryIncome" class="mt-2 text-3xl font-bold">$0.00</p>
+                    </div>
+                    <div class="p-3 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300">
+                        <i class="fas fa-arrow-up fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-b-4 border-red-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase" data-lang-en="Expenses" data-lang-he="הוצאות">Expenses</h3>
+                        <p id="summaryExpenses" class="mt-2 text-3xl font-bold">$0.00</p>
+                    </div>
+                    <div class="p-3 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300">
+                        <i class="fas fa-arrow-down fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-b-4 border-indigo-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase" data-lang-en="Net Balance" data-lang-he="מאזן נטו">Net Balance</h3>
+                        <p id="summaryNetBalance" class="mt-2 text-3xl font-bold">$0.00</p>
+                    </div>
+                    <div class="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300">
+                        <i class="fas fa-scale-balanced fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-b-4 border-blue-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase" data-lang-en="Savings Rate" data-lang-he="שיעור חיסכון">Savings Rate</h3>
+                        <p id="summarySavingsRate" class="mt-2 text-3xl font-bold">0%</p>
+                    </div>
+                    <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+                        <i class="fas fa-piggy-bank fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expense Categories and Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold" data-lang-en="Expense Categories" data-lang-he="קטגוריות הוצאה">Expense Categories</h2>
+                </div>
+                <div id="expenseCategoriesBreakdown" class="space-y-4">
+                     <div class="mb-6">
+                        <div class="flex justify-between mb-2">
+                            <span class="font-medium" data-lang-en="Fixed vs Variable" data-lang-he="קבועות מול משתנות">Fixed vs Variable</span>
+                            <span id="fixedVariableRatio" class="text-sm">$0 / $0</span>
+                        </div>
+                        <div class="flex h-4 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700">
+                            <div id="fixedBar" class="bg-red-500 transition-all duration-500" style="width: 0%"></div>
+                            <div id="variableBar" class="bg-pink-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <p id="noExpensesPlaceholderP" class="text-sm text-gray-500 dark:text-gray-400" data-lang-en="No expenses to show for selected period." data-lang-he="אין הוצאות להצגה לתקופה שנבחרה.">No expenses to show for selected period.</p>
+                </div>
+            </div>
+            
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                 <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold" data-lang-en="Spending Trends" data-lang-he="מגמות הוצאה">Spending Trends</h2>
+                 </div>
+                <div class="h-64 mt-6">
+                    <canvas id="spendingTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Income/Expense Breakdown Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4" data-lang-en="Income Breakdown" data-lang-he="פירוט הכנסות">Income Breakdown</h2>
+                <div class="flex flex-col sm:flex-row items-center justify-around mb-4">
+                    <div class="w-32 h-32 sm:w-40 sm:h-40 mb-4 sm:mb-0">
+                        <canvas id="incomePieChart"></canvas>
+                    </div>
+                    <div id="incomeLegend" class="space-y-2 text-sm">
+                         <p class="text-gray-500" data-lang-en="No income data." data-lang-he="אין נתוני הכנסה.">No income data.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4" data-lang-en="Expense Breakdown" data-lang-he="פירוט הוצאות">Expense Breakdown</h2>
+                 <div class="flex flex-col sm:flex-row items-center justify-around mb-4">
+                    <div class="w-32 h-32 sm:w-40 sm:h-40 mb-4 sm:mb-0">
+                        <canvas id="expensePieChart"></canvas>
+                    </div>
+                    <div id="expenseLegend" class="space-y-2 text-sm">
+                        <p class="text-gray-500" data-lang-en="No expense data." data-lang-he="אין נתוני הוצאה.">No expense data.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction Log -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="p-4 sm:p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
+                    <h2 class="text-xl font-bold" data-lang-en="Transaction Log" data-lang-he="יומן עסקאות">Transaction Log</h2>
+                    <div class="flex space-x-2">
+                        <button id="openAddTransactionModalBtn" class="p-2 rounded-md border bg-indigo-600 hover:bg-indigo-700 text-white transition" title="Add Transaction">
+                            <i class="fas fa-plus mr-1"></i> <span data-lang-en="Add" data-lang-he="הוסף">Add</span>
+                        </button>
+                        <input type="file" id="importCsvBtn" accept=".csv" class="hidden">
+                        <label for="importCsvBtn" class="p-2 rounded-md border bg-green-600 hover:bg-green-700 text-white transition cursor-pointer" title="Import CSV">
+                            <i class="fas fa-file-import mr-1"></i> <span data-lang-en="Import" data-lang-he="ייבוא">Import</span>
+                        </label>
+                        <button id="exportCsvBtn" class="p-2 rounded-md border bg-blue-600 hover:bg-blue-700 text-white transition" title="Export CSV">
+                            <i class="fas fa-file-export mr-1"></i> <span data-lang-en="Export" data-lang-he="ייצוא">Export</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full transaction-table">
+                        <thead>
+                            <tr class="text-left border-b border-gray-200 dark:border-gray-700">
+                                <th class="pb-2 text-gray-500 dark:text-gray-400 font-medium" data-lang-en="Date" data-lang-he="תאריך">Date</th>
+                                <th class="pb-2 text-gray-500 dark:text-gray-400 font-medium" data-lang-en="Type" data-lang-he="סוג">Type</th>
+                                <th class="pb-2 text-gray-500 dark:text-gray-400 font-medium" data-lang-en="Category" data-lang-he="קטגוריה">Category</th>
+                                <th class="pb-2 text-gray-500 dark:text-gray-400 font-medium text-right" data-lang-en="Amount" data-lang-he="סכום">Amount</th>
+                                <th class="pb-2 text-gray-500 dark:text-gray-400 font-medium" data-lang-en="Method" data-lang-he="אמצעי">Method</th>
+                                <th class="pb-2 text-gray-500 dark:text-gray-400 font-medium" data-lang-en="Shared" data-lang-he="משותף">Shared</th>
+                                <th class="pb-2 text-gray-500 dark:text-gray-400 font-medium" data-lang-en="Notes" data-lang-he="הערות">Notes</th>
+                                <th class="pb-2 text-gray-500 dark:text-gray-400 font-medium" data-lang-en="Actions" data-lang-he="פעולות">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionTableBody">
+                            <!-- Rows will be added via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="paginationControls" class="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                </div>
+        </div>
+
+        <!-- AI Analysis Section -->
+        <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold" data-lang-en="AI Financial Analysis" data-lang-he="ניתוח פיננסי AI">AI Financial Analysis</h2>
+                <button id="analyzeFinancesBtn" class="text-sm bg-teal-500 hover:bg-teal-600 text-white py-2 px-3 rounded-md transition flex items-center">
+                    <i class="fas fa-robot mr-2"></i> <span data-lang-en="Analyze Current Month" data-lang-he="נתח חודש נוכחי">Analyze Current Month</span>
+                </button>
+            </div>
+            <div id="aiAnalysisResultContainer" class="bg-blue-50 dark:bg-gray-700 rounded-lg p-4 min-h-[100px]">
+                <p id="aiAnalysisPlaceholder" class="text-gray-700 dark:text-gray-300 text-sm" data-lang-en="Click 'Analyze' to get AI insights on your finances for the selected month." data-lang-he="לחץ 'נתח' לקבלת תובנות AI על הכספים שלך עבור החודש הנבחר.">Click 'Analyze' to get AI insights on your finances for the selected month.</p>
+                <div id="aiAnalysisResult"></div>
+                <div id="aiLoadingIndicator" class="hidden text-center">
+                    <i class="fas fa-spinner fa-spin fa-2x text-indigo-500"></i>
+                    <p data-lang-en="Analyzing..." data-lang-he="מנתח...">Analyzing...</p>
+                </div>
+            </div>
+            <!-- AI Settings Section -->
+            <div id="aiSettingsSection" class="mt-6 border-t pt-4 border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold mb-2" data-lang-en="Settings" data-lang-he="הגדרות">Settings</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="googleApiKeyInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" data-lang-en="Your Google API Key (Optional)" data-lang-he="מפתח Google API שלך (אופציונלי)">Your Google API Key (Optional)</label>
+                        <div class="flex items-center">
+                            <input type="password" id="googleApiKeyInput" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md dark:bg-gray-700 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter your API Key">
+                            <button id="saveApiKeyBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-r-md text-sm" data-lang-en="Save Key" data-lang-he="שמור מפתח">Save Key</button>
+                        </div>
+                        <p id="apiKeySavedMessage" class="text-xs text-green-600 dark:text-green-400 mt-1 opacity-0" data-lang-en="API Key saved!" data-lang-he="מפתח API נשמר!"></p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <span data-lang-en="To use the AI features with your own usage limits, you can provide your Google API key." data-lang-he="כדי להשתמש בתכונות ה-AI עם מגבלות השימוש שלך, תוכל לספק מפתח Google API משלך.">To use the AI features with your own usage limits, you can provide your Google API key.</span>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 underline" data-lang-en="Get your API Key from Google AI Studio." data-lang-he="קבל את מפתח ה-API שלך מ-Google AI Studio.">Get your API Key from Google AI Studio.</a>
+                        </p>
+                    </div>
+                    <div>
+                        <label for="currencySelector" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" data-lang-en="Display Currency" data-lang-he="מטבע תצוגה">Display Currency</label>
+                         <select id="currencySelector" class="w-full p-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="USD">$ (USD)</option>
+                            <option value="ILS">₪ (ILS)</option>
+                        </select>
+                        <p id="currencySavedMessage" class="text-xs text-green-600 dark:text-green-400 mt-1 opacity-0" data-lang-en="Currency saved!" data-lang-he="מטבע נשמר!"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Transaction Modal -->
+    <div id="transactionModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeModalBtn">&times;</span>
+            <h2 id="modalTitle" class="text-xl font-bold mb-4" data-lang-en="Add Transaction" data-lang-he="הוסף עסקה">Add Transaction</h2>
+            <form id="transactionForm">
+                <input type="hidden" id="transactionId">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="transactionDate" class="block text-sm font-medium mb-1" data-lang-en="Date" data-lang-he="תאריך">Date</label>
+                        <input type="date" id="transactionDate" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" required>
+                    </div>
+                    <div>
+                        <label for="transactionAmount" class="block text-sm font-medium mb-1" data-lang-en="Amount" data-lang-he="סכום">Amount</label>
+                        <input type="number" id="transactionAmount" step="0.01" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" required>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <label for="transactionNotes" class="block text-sm font-medium mb-1" data-lang-en="Notes" data-lang-he="הערות">Notes</label>
+                    <div class="flex items-center">
+                        <textarea id="transactionNotes" rows="2" class="w-full p-2 border rounded-l-md dark:bg-gray-700 dark:border-gray-600"></textarea>
+                        <button type="button" id="generateNoteBtn" class="ai-button rounded-r-md" title="Generate Note with AI">
+                            <i class="fas fa-magic"></i>
+                        </button>
+                    </div>
+                     <div id="generateNoteLoading" class="text-xs text-gray-500 mt-1 hidden" data-lang-en="Generating note..." data-lang-he="יוצר הערה...">Generating note...</div>
+                </div>
+                
+                <div class="mt-4 mb-2 flex items-center">
+                     <label class="block text-sm font-medium mr-2" data-lang-en="AI Suggestion:" data-lang-he="הצעת AI:">AI Suggestion:</label>
+                    <button type="button" id="suggestCategoryBtn" class="ai-button" title="Suggest Category with AI">
+                        <i class="fas fa-lightbulb"></i> <span data-lang-en="Suggest Type & Category" data-lang-he="הצע סוג וקטגוריה">Suggest Type & Category</span>
+                    </button>
+                     <div id="suggestCategoryLoading" class="text-xs text-indigo-500 ml-2 hidden" data-lang-en="Getting suggestion..." data-lang-he="מקבל הצעה...">Getting suggestion...</div>
+                </div>
+
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="transactionType" class="block text-sm font-medium mb-1" data-lang-en="Type" data-lang-he="סוג">Type</label>
+                        <select id="transactionType" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" required>
+                            <option value="Income" data-lang-en="Income" data-lang-he="הכנסה">Income</option>
+                            <option value="Expense-Fixed" data-lang-en="Fixed Expense" data-lang-he="הוצאה קבועה">Fixed Expense</option>
+                            <option value="Expense-Variable" data-lang-en="Variable Expense" data-lang-he="הוצאה משתנה">Variable Expense</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="transactionCategory" class="block text-sm font-medium mb-1" data-lang-en="Category" data-lang-he="קטגוריה">Category</label>
+                        <select id="transactionCategory" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" required>
+                            <!-- Options populated by JS based on type -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                        <label for="transactionMethod" class="block text-sm font-medium mb-1" data-lang-en="Payment Method" data-lang-he="אמצעי תשלום">Payment Method</label>
+                        <select id="transactionMethod" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600" required>
+                            <option value="Credit Card" data-lang-en="Credit Card" data-lang-he="כרטיס אשראי">Credit Card</option>
+                            <option value="Bank Transfer" data-lang-en="Bank Transfer" data-lang-he="העברה בנקאית">Bank Transfer</option>
+                            <option value="Cash" data-lang-en="Cash" data-lang-he="מזומן">Cash</option>
+                            <option value="Other" data-lang-en="Other" data-lang-he="אחר">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" data-lang-en="Shared Expense?" data-lang-he="הוצאה משותפת?">Shared Expense?</label>
+                        <div class="mt-1">
+                             <input type="checkbox" id="transactionShared" class="mr-2 leading-tight h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:checked:bg-indigo-500">
+                             <span data-lang-en="Yes" data-lang-he="כן">Yes</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="partnerFieldContainer" class="mt-4 hidden">
+                    <label for="transactionPartner" class="block text-sm font-medium mb-1" data-lang-en="Partner Name (if shared)" data-lang-he="שם שותף (אם משותף)">Partner Name (if shared)</label>
+                    <input type="text" id="transactionPartner" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" id="cancelTransactionBtn" class="px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 rounded-md transition" data-lang-en="Cancel" data-lang-he="ביטול">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition" data-lang-en="Save Transaction" data-lang-he="שמור עסקה">Save Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // --- App State and Constants ---
+        const APP_PREFIX = 'financialDashboard_';
+        let currentLanguage = 'en';
+        let transactions = [];
+        let spendingTrendChart, incomePieChart, expensePieChart;
+        const ITEMS_PER_PAGE = 10;
+        let currentPage = 1;
+        const API_KEY_STORAGE_ID = APP_PREFIX + 'googleApiKey';
+        const CURRENCY_SETTING_STORAGE_ID = APP_PREFIX + 'currencySetting';
+        let currentCurrencySymbol = '$'; // Default
+        let currentCurrencyCode = 'USD'; // Default
+
+
+        const categories = {
+            income: [
+                { value: "Salary", textEn: "Salary", textHe: "משכורת" },
+                { value: "Freelance", textEn: "Freelance", textHe: "פרילנס" },
+                { value: "Investments", textEn: "Investments", textHe: "השקעות" },
+                { value: "Gift Income", textEn: "Gift", textHe: "מתנה" },
+                { value: "Other Income", textEn: "Other", textHe: "אחר" }
+            ],
+            fixedExpense: [
+                { value: "Rent", textEn: "Rent", textHe: "שכירות" },
+                { value: "Utilities", textEn: "Utilities", textHe: "חשבונות" },
+                { value: "Gym", textEn: "Gym", textHe: "חדר כושר" },
+                { value: "Insurance", textEn: "Insurance", textHe: "ביטוח" },
+                { value: "Subscriptions", textEn: "Subscriptions", textHe: "מנויים" },
+                { value: "Loan Payment", textEn: "Loan Payment", textHe: "החזר הלוואה" },
+                { value: "Other Fixed", textEn: "Other Fixed", textHe: "קבועות אחרות" }
+            ],
+            variableExpense: [
+                { value: "Groceries", textEn: "Groceries", textHe: "מצרכים" },
+                { value: "Restaurants", textEn: "Restaurants", textHe: "מסעדות" },
+                { value: "Entertainment", textEn: "Entertainment", textHe: "בידור" },
+                { value: "Shopping", textEn: "Shopping", textHe: "קניות" },
+                { value: "Transport", textEn: "Transport", textHe: "תחבורה" },
+                { value: "Gifts Expense", textEn: "Gifts", textHe: "מתנות" },
+                { value: "Healthcare", textEn: "Healthcare", textHe: "בריאות" },
+                { value: "Vacation", textEn: "Vacation", textHe: "חופשה" },
+                { value: "Other Variable", textEn: "Other Variable", textHe: "משתנות אחרות" }
+            ]
+        };
+
+        const allCategoryValues = [
+            ...categories.income.map(c => c.value),
+            ...categories.fixedExpense.map(c => c.value),
+            ...categories.variableExpense.map(c => c.value)
+        ];
+
+        const categoryColors = {
+            "Salary": "#22c55e", "Freelance": "#16a34a", "Investments": "#15803d", "Gift Income": "#14b8a6", "Other Income": "#0d9488",
+            "Rent": "#ef4444", "Utilities": "#dc2626", "Gym": "#b91c1c", "Insurance": "#991b1b", "Subscriptions": "#f87171", "Loan Payment": "#fca5a5", "Other Fixed": "#ef4444",
+            "Groceries": "#ec4899", "Restaurants": "#db2777", "Entertainment": "#be185d", "Shopping": "#9d174d", "Transport": "#f472b6", "Gifts Expense": "#f0abfc", "Healthcare": "#e879f9", "Vacation": "#d946ef", "Other Variable": "#ec4899",
+        };
+
+        // --- DOM Elements ---
+        const langToggle = document.getElementById('langToggle');
+        const themeToggle = document.getElementById('themeToggle');
+        const transactionTableBody = document.getElementById('transactionTableBody');
+        const openAddTransactionModalBtn = document.getElementById('openAddTransactionModalBtn');
+        const transactionModal = document.getElementById('transactionModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const transactionForm = document.getElementById('transactionForm');
+        const modalTitle = document.getElementById('modalTitle');
+        const filterMonthSelect = document.getElementById('filterMonth');
+        const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+        const importCsvBtn = document.getElementById('importCsvBtn');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+        const analyzeFinancesBtn = document.getElementById('analyzeFinancesBtn');
+        const aiAnalysisResultContainer = document.getElementById('aiAnalysisResultContainer');
+        const aiAnalysisResultDiv = document.getElementById('aiAnalysisResult');
+        const aiAnalysisPlaceholder = document.getElementById('aiAnalysisPlaceholder');
+        const aiLoadingIndicator = document.getElementById('aiLoadingIndicator');
+        const paginationControls = document.getElementById('paginationControls');
+        const suggestCategoryBtn = document.getElementById('suggestCategoryBtn');
+        const generateNoteBtn = document.getElementById('generateNoteBtn');
+        const suggestCategoryLoading = document.getElementById('suggestCategoryLoading');
+        const generateNoteLoading = document.getElementById('generateNoteLoading');
+        const googleApiKeyInput = document.getElementById('googleApiKeyInput');
+        const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
+        const apiKeySavedMessage = document.getElementById('apiKeySavedMessage');
+        const currencySelector = document.getElementById('currencySelector');
+        const currencySavedMessage = document.getElementById('currencySavedMessage');
+
+
+        // --- Language, Theme, and Currency Settings ---
+        function setLanguage(lang) {
+            currentLanguage = lang;
+            document.documentElement.lang = lang;
+            document.body.dir = lang === 'he' ? 'rtl' : 'ltr';
+
+            document.querySelectorAll('[data-lang-en]').forEach(el => {
+                const textKey = lang === 'he' ? 'langHe' : 'langEn';
+                const text = el.dataset[textKey] || el.dataset['langEn'];
+
+                if (el.tagName === 'OPTGROUP' && el.hasAttribute('label')) {
+                     const labelKey = lang === 'he' ? 'langHeLabel' : 'langEnLabel';
+                     el.label = el.dataset[labelKey] || el.dataset['langEnLabel'];
+                } else if (el.tagName === 'OPTION' || el.tagName === 'SPAN' || el.tagName === 'BUTTON' || el.tagName === 'H1' || el.tagName === 'H2' || el.tagName === 'H3' || el.tagName === 'P' || el.tagName === 'LABEL' && !el.closest('label.lang-toggle-label')) {
+                     el.textContent = text;
+                }
+            });
+            populateCategoryDropdown(document.getElementById('transactionType').value, 'transactionCategory');
+            populateFilterCategoryDropdown();
+            renderTransactions(getPaginatedTransactions(getFilteredTransactions())); 
+            updateAllSummariesAndCharts(); 
+        }
+        
+        function populateFilterCategoryDropdown() {
+            const filterCategorySelect = document.getElementById('filterCategory');
+            const currentFilterValue = filterCategorySelect.value; 
+            filterCategorySelect.innerHTML = `<option value="all">${currentLanguage === 'he' ? 'כל הקטגוריות' : 'All Categories'}</option>`;
+            
+            const createOptGroup = (labelKeyEn, labelKeyHe, cats) => {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = currentLanguage === 'he' ? labelKeyHe : labelKeyEn;
+                cats.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.value;
+                    option.textContent = currentLanguage === 'he' ? cat.textHe : cat.textEn;
+                    optgroup.appendChild(option);
+                });
+                return optgroup;
+            };
+
+            filterCategorySelect.appendChild(createOptGroup('Income', 'הכנסות', categories.income));
+            filterCategorySelect.appendChild(createOptGroup('Fixed Expenses', 'הוצאות קבועות', categories.fixedExpense));
+            filterCategorySelect.appendChild(createOptGroup('Variable Expenses', 'הוצאות משתנות', categories.variableExpense));
+            filterCategorySelect.value = currentFilterValue; 
+        }
+
+        langToggle.addEventListener('change', (e) => {
+            setLanguage(e.target.checked ? 'he' : 'en');
+            localStorage.setItem(APP_PREFIX + 'language', currentLanguage);
+        });
+
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            const isDarkMode = document.documentElement.classList.contains('dark');
+            localStorage.setItem(APP_PREFIX + 'darkMode', isDarkMode ? 'enabled' : 'disabled');
+            updateAllSummariesAndCharts(); 
+        });
+
+        function saveCurrencySetting() {
+            const selectedCurrency = currencySelector.value;
+            localStorage.setItem(CURRENCY_SETTING_STORAGE_ID, selectedCurrency);
+            currentCurrencyCode = selectedCurrency;
+            currentCurrencySymbol = selectedCurrency === 'ILS' ? '₪' : '$';
+
+            currencySavedMessage.classList.remove('opacity-0');
+             setTimeout(() => {
+                currencySavedMessage.classList.add('opacity-0');
+            }, 2000);
+
+            setLanguage(currentLanguage); // To re-render texts and amounts
+            updateAllSummariesAndCharts();
+            renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+        }
+        currencySelector.addEventListener('change', saveCurrencySetting);
+
+
+        function loadInitialSettings() {
+            // Language
+            const savedLang = localStorage.getItem(APP_PREFIX + 'language');
+            if (savedLang) {
+                langToggle.checked = savedLang === 'he';
+            }
+            // Set language first as other settings might depend on it for display
+            setLanguage(langToggle.checked ? 'he' : 'en'); 
+
+
+            // Theme
+            if (localStorage.getItem(APP_PREFIX + 'darkMode') === 'enabled') {
+                document.documentElement.classList.add('dark');
+            }
+            
+            // Currency
+            const savedCurrency = localStorage.getItem(CURRENCY_SETTING_STORAGE_ID);
+            if (savedCurrency) {
+                currencySelector.value = savedCurrency;
+                currentCurrencyCode = savedCurrency;
+                currentCurrencySymbol = savedCurrency === 'ILS' ? '₪' : '$';
+            } else { // Default to USD if nothing saved
+                currencySelector.value = 'USD';
+                currentCurrencyCode = 'USD';
+                currentCurrencySymbol = '$';
+            }
+
+
+            populateFilterCategoryDropdown();
+            loadApiKey(); // Load API key after basic settings
+
+            // Initial UI update based on all loaded settings
+            updateAllSummariesAndCharts();
+            renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+        }
+        
+        // --- API Key Management ---
+        function saveApiKey() {
+            const apiKey = googleApiKeyInput.value.trim();
+            if (apiKey) {
+                localStorage.setItem(API_KEY_STORAGE_ID, apiKey);
+                apiKeySavedMessage.textContent = currentLanguage === 'he' ? 'מפתח API נשמר!' : 'API Key saved!';
+                apiKeySavedMessage.classList.remove('opacity-0', 'text-orange-600', 'dark:text-orange-400');
+                apiKeySavedMessage.classList.add('text-green-600', 'dark:text-green-400');
+
+            } else {
+                localStorage.removeItem(API_KEY_STORAGE_ID);
+                 apiKeySavedMessage.textContent = currentLanguage === 'he' ? 'מפתח API הוסר.' : 'API Key removed.';
+                 apiKeySavedMessage.classList.remove('text-green-600', 'dark:text-green-400');
+                 apiKeySavedMessage.classList.add('text-orange-600', 'dark:text-orange-400');
+            }
+            apiKeySavedMessage.classList.remove('opacity-0');
+            setTimeout(() => {
+                apiKeySavedMessage.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        function loadApiKey() {
+            const savedKey = localStorage.getItem(API_KEY_STORAGE_ID);
+            if (savedKey) {
+                googleApiKeyInput.value = savedKey;
+            }
+        }
+        saveApiKeyBtn.addEventListener('click', saveApiKey);
+
+
+        // --- LocalStorage Data Management ---
+        function loadTransactions() {
+            const storedTransactions = localStorage.getItem(APP_PREFIX + 'transactions');
+            transactions = storedTransactions ? JSON.parse(storedTransactions) : getDefaultTransactions();
+            transactions.sort((a, b) => new Date(b.date) - new Date(a.date)); 
+        }
+
+        function saveTransactions() {
+            transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+            localStorage.setItem(APP_PREFIX + 'transactions', JSON.stringify(transactions));
+        }
+        
+        function getDefaultTransactions() {
+            const today = new Date();
+            const oneMonthAgo = new Date(new Date().setMonth(today.getMonth() - 1));
+            
+            return [
+                { id: '1', date: oneMonthAgo.toISOString().split('T')[0], type: 'Income', category: 'Salary', amount: 5000, method: 'Bank Transfer', shared: false, partner: '', notes: 'Monthly Salary' },
+                { id: '2', date: oneMonthAgo.toISOString().split('T')[0], type: 'Expense-Fixed', category: 'Rent', amount: 1500, method: 'Bank Transfer', shared: false, partner: '', notes: 'Apartment Rent' },
+                { id: '3', date: new Date(new Date(oneMonthAgo).setDate(oneMonthAgo.getDate() + 5)).toISOString().split('T')[0], type: 'Expense-Variable', category: 'Groceries', amount: 150, method: 'Credit Card', shared: false, partner: '', notes: 'Weekly Groceries' },
+                { id: '4', date: today.toISOString().split('T')[0], type: 'Income', category: 'Freelance', amount: 750, method: 'Bank Transfer', shared: false, partner: '', notes: 'Project X' },
+                { id: '5', date: today.toISOString().split('T')[0], type: 'Expense-Variable', category: 'Restaurants', amount: 60, method: 'Credit Card', shared: true, partner: 'Partner A', notes: 'Dinner out' },
+            ];
+        }
+
+
+        // --- Transaction Modal and Form ---
+        function populateCategoryDropdown(type, dropdownId) {
+            const categorySelect = document.getElementById(dropdownId);
+            const currentCategoryValue = categorySelect.value; 
+            categorySelect.innerHTML = ''; 
+            let catsToShow = [];
+            if (type === 'Income') catsToShow = categories.income;
+            else if (type === 'Expense-Fixed') catsToShow = categories.fixedExpense;
+            else if (type === 'Expense-Variable') catsToShow = categories.variableExpense;
+
+            catsToShow.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.value;
+                option.textContent = currentLanguage === 'he' ? cat.textHe : cat.textEn;
+                categorySelect.appendChild(option);
+            });
+            if (catsToShow.some(c => c.value === currentCategoryValue)) {
+                 categorySelect.value = currentCategoryValue;
+            }
+        }
+
+        document.getElementById('transactionType').addEventListener('change', (e) => {
+            populateCategoryDropdown(e.target.value, 'transactionCategory');
+        });
+        
+        document.getElementById('transactionShared').addEventListener('change', (e) => {
+            document.getElementById('partnerFieldContainer').classList.toggle('hidden', !e.target.checked);
+        });
+
+        openAddTransactionModalBtn.addEventListener('click', () => {
+            transactionModal.style.display = 'block';
+            transactionForm.reset();
+            document.getElementById('transactionId').value = ''; 
+            modalTitle.dataset.langEn = "Add Transaction"; 
+            modalTitle.dataset.langHe = "הוסף עסקה";
+            modalTitle.textContent = currentLanguage === 'he' ? modalTitle.dataset.langHe : modalTitle.dataset.langEn;
+            document.getElementById('transactionDate').value = new Date().toISOString().split('T')[0]; 
+            populateCategoryDropdown(document.getElementById('transactionType').value, 'transactionCategory'); 
+            document.getElementById('partnerFieldContainer').classList.add('hidden');
+        });
+
+        closeModalBtn.addEventListener('click', () => transactionModal.style.display = 'none');
+        document.getElementById('cancelTransactionBtn').addEventListener('click', () => transactionModal.style.display = 'none');
+        window.addEventListener('click', (event) => {
+            if (event.target == transactionModal) {
+                transactionModal.style.display = 'none';
+            }
+        });
+
+        transactionForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('transactionId').value;
+            const transactionData = {
+                id: id || Date.now().toString(), 
+                date: document.getElementById('transactionDate').value,
+                type: document.getElementById('transactionType').value,
+                category: document.getElementById('transactionCategory').value,
+                amount: parseFloat(document.getElementById('transactionAmount').value),
+                method: document.getElementById('transactionMethod').value,
+                shared: document.getElementById('transactionShared').checked,
+                partner: document.getElementById('transactionShared').checked ? document.getElementById('transactionPartner').value : '',
+                notes: document.getElementById('transactionNotes').value,
+            };
+
+            if (id) { 
+                const index = transactions.findIndex(t => t.id === id);
+                if (index !== -1) transactions[index] = transactionData;
+            } else { 
+                transactions.push(transactionData);
+            }
+            
+            saveTransactions();
+            renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+            updateAllSummariesAndCharts();
+            transactionModal.style.display = 'none';
+        });
+
+        // --- Rendering Transactions ---
+        function renderTransactions(transactionsToRender) {
+            transactionTableBody.innerHTML = '';
+            if (!transactionsToRender || transactionsToRender.length === 0) {
+                const row = transactionTableBody.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 8; 
+                cell.className = 'text-center py-4 text-gray-500 dark:text-gray-400';
+                cell.textContent = currentLanguage === 'he' ? 'לא נמצאו עסקאות.' : 'No transactions found.';
+                return;
+            }
+
+            transactionsToRender.forEach(t => {
+                const row = transactionTableBody.insertRow();
+                row.className = 'border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors';
+                
+                if (t.type === 'Income') row.classList.add('income-row');
+                else if (t.type === 'Expense-Fixed') row.classList.add('fixed-expense-row');
+                else if (t.type === 'Expense-Variable') row.classList.add('variable-expense-row');
+
+                if (t.shared) row.classList.add('shared-row');
+                else row.classList.add('not-shared-row');
+
+                row.insertCell().textContent = new Date(t.date).toLocaleDateString(currentLanguage === 'he' ? 'he-IL' : 'en-CA');
+                
+                let typeText = t.type;
+                if (currentLanguage === 'he') {
+                    if (t.type === 'Income') typeText = 'הכנסה';
+                    else if (t.type === 'Expense-Fixed') typeText = 'הוצאה קבועה';
+                    else if (t.type === 'Expense-Variable') typeText = 'הוצאה משתנה';
+                }
+                row.insertCell().textContent = typeText;
+
+                let categoryText = t.category;
+                const allCats = [...categories.income, ...categories.fixedExpense, ...categories.variableExpense];
+                const catDefinition = allCats.find(c => c.value === t.category);
+                if (catDefinition) {
+                    categoryText = currentLanguage === 'he' ? catDefinition.textHe : catDefinition.textEn;
+                }
+                row.insertCell().textContent = categoryText;
+
+                const amountCell = row.insertCell();
+                amountCell.textContent = `${t.type.includes('Expense') ? '-' : ''}${currentCurrencySymbol}${t.amount.toFixed(2)}`;
+                amountCell.className = `font-medium text-right ${t.type.includes('Expense') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`;
+                
+                let methodText = t.method;
+                 if (currentLanguage === 'he') {
+                    if (t.method === 'Credit Card') methodText = 'כרטיס אשראי';
+                    else if (t.method === 'Bank Transfer') methodText = 'העברה בנקאית';
+                    else if (t.method === 'Cash') methodText = 'מזומן';
+                    else if (t.method === 'Other') methodText = 'אחר';
+                }
+                row.insertCell().textContent = methodText;
+
+                const sharedCell = row.insertCell();
+                sharedCell.textContent = t.shared ? (currentLanguage === 'he' ? 'כן' : 'Yes') + (t.partner ? ` (${t.partner})` : '') : (currentLanguage === 'he' ? 'לא' : 'No');
+                if(t.shared) sharedCell.classList.add('text-orange-600', 'dark:text-orange-400'); else sharedCell.classList.add('text-purple-600', 'dark:text-purple-400');
+
+
+                const notesCell = row.insertCell();
+                notesCell.textContent = t.notes;
+                notesCell.className = 'text-sm text-gray-500 dark:text-gray-400 truncate max-w-[100px] sm:max-w-[150px]';
+                notesCell.title = t.notes;
+
+                const actionsCell = row.insertCell();
+                actionsCell.className = 'py-3 text-center';
+                const editBtn = document.createElement('button');
+                editBtn.innerHTML = '<i class="fas fa-edit text-blue-500 hover:text-blue-700"></i>';
+                editBtn.title = currentLanguage === 'he' ? 'ערוך' : 'Edit';
+                editBtn.classList.add('mr-2', 'p-1');
+                editBtn.onclick = () => editTransaction(t.id);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '<i class="fas fa-trash text-red-500 hover:text-red-700"></i>';
+                deleteBtn.title = currentLanguage === 'he' ? 'מחק' : 'Delete';
+                deleteBtn.classList.add('p-1');
+                deleteBtn.onclick = () => deleteTransaction(t.id);
+                
+                actionsCell.appendChild(editBtn);
+                actionsCell.appendChild(deleteBtn);
+            });
+            renderPagination(getFilteredTransactions().length);
+        }
+        
+        function editTransaction(id) {
+            const transaction = transactions.find(t => t.id === id);
+            if (!transaction) return;
+
+            document.getElementById('transactionId').value = transaction.id;
+            document.getElementById('transactionDate').value = transaction.date;
+            document.getElementById('transactionType').value = transaction.type;
+            
+            populateCategoryDropdown(transaction.type, 'transactionCategory'); 
+            document.getElementById('transactionCategory').value = transaction.category; 
+
+            document.getElementById('transactionAmount').value = transaction.amount;
+            document.getElementById('transactionMethod').value = transaction.method;
+            document.getElementById('transactionShared').checked = transaction.shared;
+            document.getElementById('transactionPartner').value = transaction.partner;
+            document.getElementById('transactionNotes').value = transaction.notes;
+
+            document.getElementById('partnerFieldContainer').classList.toggle('hidden', !transaction.shared);
+            
+            modalTitle.dataset.langEn = "Edit Transaction";
+            modalTitle.dataset.langHe = "ערוך עסקה";
+            modalTitle.textContent = currentLanguage === 'he' ? modalTitle.dataset.langHe : modalTitle.dataset.langEn;
+            transactionModal.style.display = 'block';
+        }
+
+        function deleteTransaction(id) {
+            const confirmDelete = confirm(currentLanguage === 'he' ? 'האם אתה בטוח שברצונך למחוק עסקה זו?' : 'Are you sure you want to delete this transaction?');
+            if (confirmDelete) {
+                transactions = transactions.filter(t => t.id !== id);
+                saveTransactions();
+                renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+                updateAllSummariesAndCharts();
+            }
+        }
+
+        // --- Filtering ---
+        function populateMonthFilter() {
+            const months = new Set();
+            transactions.forEach(t => {
+                const date = new Date(t.date);
+                months.add(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+            });
+            
+            const sortedMonths = Array.from(months).sort().reverse(); 
+            filterMonthSelect.innerHTML = `<option value="all">${currentLanguage === 'he' ? 'כל החודשים' : 'All Months'}</option>`;
+            sortedMonths.forEach(monthVal => {
+                const option = document.createElement('option');
+                option.value = monthVal;
+                const [year, monthNum] = monthVal.split('-');
+                const date = new Date(year, monthNum - 1, 1);
+                option.textContent = date.toLocaleString(currentLanguage === 'he' ? 'he-IL' : 'en-US', { month: 'long', year: 'numeric' });
+                filterMonthSelect.appendChild(option);
+            });
+            const currentMonthYear = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+            if (sortedMonths.includes(currentMonthYear)) {
+                filterMonthSelect.value = currentMonthYear;
+            } else if (sortedMonths.length > 0) {
+                 filterMonthSelect.value = sortedMonths[0]; 
+            } else {
+                filterMonthSelect.value = "all";
+            }
+        }
+
+        function getFilteredTransactions() {
+            const selectedMonthYear = filterMonthSelect.value;
+            const selectedMethod = document.getElementById('filterPaymentMethod').value;
+            const selectedCategory = document.getElementById('filterCategory').value;
+
+            return transactions.filter(t => {
+                const transactionDate = new Date(t.date);
+                const transactionMonthYear = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
+                
+                const monthMatch = selectedMonthYear === 'all' || transactionMonthYear === selectedMonthYear;
+                const methodMatch = selectedMethod === 'all' || t.method === selectedMethod;
+                const categoryMatch = selectedCategory === 'all' || t.category === selectedCategory;
+                
+                return monthMatch && methodMatch && categoryMatch;
+            });
+        }
+
+        applyFiltersBtn.addEventListener('click', () => {
+            currentPage = 1; 
+            renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+            updateAllSummariesAndCharts();
+        });
+        
+        // --- Pagination ---
+        function getPaginatedTransactions(filteredTransactionsList) {
+            const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = startIndex + ITEMS_PER_PAGE;
+            return filteredTransactionsList.slice(startIndex, endIndex);
+        }
+
+        function renderPagination(totalItems) {
+            paginationControls.innerHTML = '';
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+            if (totalPages <= 1) return; 
+
+            const showingText = document.createElement('p');
+            showingText.className = 'text-sm text-gray-700 dark:text-gray-300';
+            const startItem = totalItems === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
+            const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+            
+            if (currentLanguage === 'he') {
+                showingText.innerHTML = `מציג <span class="font-medium">${startItem}</span> עד <span class="font-medium">${endItem}</span> מתוך <span class="font-medium">${totalItems}</span>`;
+            } else {
+                showingText.innerHTML = `Showing <span class="font-medium">${startItem}</span> to <span class="font-medium">${endItem}</span> of <span class="font-medium">${totalItems}</span>`;
+            }
+            paginationControls.appendChild(showingText);
+
+            const buttonsContainer = document.createElement('div');
+            buttonsContainer.className = 'flex space-x-1';
+
+            const prevButton = document.createElement('button');
+            prevButton.textContent = currentLanguage === 'he' ? 'הקודם' : 'Previous';
+            prevButton.className = 'px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 text-sm disabled:opacity-50';
+            prevButton.disabled = currentPage === 1;
+            prevButton.onclick = () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+                }
+            };
+            buttonsContainer.appendChild(prevButton);
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (totalPages > 5 && (i > 2 && i < currentPage - 1 && i !== 1) || (i < totalPages -1 && i > currentPage + 1 && i !== totalPages)) {
+                    if (i === 3 && currentPage > 4 || i === totalPages - 2 && currentPage < totalPages - 3) {
+                         const ellipsis = document.createElement('span');
+                         ellipsis.textContent = '...';
+                         ellipsis.className = 'px-3 py-1 text-sm';
+                         buttonsContainer.appendChild(ellipsis);
+                    }
+                    continue;
+                }
+
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                pageButton.className = `px-3 py-1 rounded-md border text-sm ${i === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'}`;
+                pageButton.onclick = () => {
+                    currentPage = i;
+                    renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+                };
+                buttonsContainer.appendChild(pageButton);
+            }
+
+            const nextButton = document.createElement('button');
+            nextButton.textContent = currentLanguage === 'he' ? 'הבא' : 'Next';
+            nextButton.className = 'px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 text-sm disabled:opacity-50';
+            nextButton.disabled = currentPage === totalPages;
+            nextButton.onclick = () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+                }
+            };
+            buttonsContainer.appendChild(nextButton);
+            paginationControls.appendChild(buttonsContainer);
+        }
+
+
+        // --- Summaries and Charts ---
+        function updateDashboardSummaries(filtered = null) {
+            const transToSummarize = filtered || getFilteredTransactions(); 
+            
+            let totalIncome = 0;
+            let totalExpenses = 0;
+            transToSummarize.forEach(t => {
+                if (t.type === 'Income') totalIncome += t.amount;
+                else if (t.type.includes('Expense')) totalExpenses += t.amount;
+            });
+            const netBalance = totalIncome - totalExpenses;
+            const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0;
+
+            document.getElementById('summaryIncome').textContent = `${currentCurrencySymbol}${totalIncome.toFixed(2)}`;
+            document.getElementById('summaryExpenses').textContent = `${currentCurrencySymbol}${totalExpenses.toFixed(2)}`;
+            document.getElementById('summaryNetBalance').textContent = `${currentCurrencySymbol}${netBalance.toFixed(2)}`;
+            document.getElementById('summaryNetBalance').className = `mt-2 text-3xl font-bold ${netBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`;
+            document.getElementById('summarySavingsRate').textContent = `${savingsRate.toFixed(1)}%`;
+
+            updateExpenseCategoryBreakdown(transToSummarize);
+        }
+
+        function updateExpenseCategoryBreakdown(filteredTrans) {
+            const breakdownContainer = document.getElementById('expenseCategoriesBreakdown');
+            const fixedVariableRatioSpan = document.getElementById('fixedVariableRatio');
+            const fixedBarEl = document.getElementById('fixedBar');
+            const variableBarEl = document.getElementById('variableBar');
+            const noExpensesPlaceholderEl = document.getElementById('noExpensesPlaceholderP');
+
+            document.querySelectorAll('#expenseCategoriesBreakdown .dynamic-category-item').forEach(el => el.remove());
+
+            const expenses = filteredTrans.filter(t => t.type.includes('Expense'));
+            let totalFixed = 0;
+            let totalVariable = 0;
+
+            if (expenses.length > 0) {
+                if(noExpensesPlaceholderEl) noExpensesPlaceholderEl.classList.add('hidden');
+
+                expenses.forEach(exp => {
+                    if (exp.type === 'Expense-Fixed') totalFixed += exp.amount;
+                    if (exp.type === 'Expense-Variable') totalVariable += exp.amount;
+                });
+
+                const expensesByCategory = expenses.reduce((acc, curr) => {
+                    acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+                    return acc;
+                }, {});
+
+                Object.entries(expensesByCategory).forEach(([category, amount]) => {
+                    const catDefinition = [...categories.fixedExpense, ...categories.variableExpense].find(c => c.value === category);
+                    const categoryName = catDefinition ? (currentLanguage === 'he' ? catDefinition.textHe : catDefinition.textEn) : category;
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'dynamic-category-item space-y-1'; 
+                    
+                    const labelDiv = document.createElement('div');
+                    labelDiv.className = 'flex justify-between';
+                    labelDiv.innerHTML = `<span class="font-medium">${categoryName}</span> <span>${currentCurrencySymbol}${amount.toFixed(2)}</span>`;
+                    
+                    const barDivContainer = document.createElement('div');
+                    barDivContainer.className = 'w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5';
+                    const innerBar = document.createElement('div');
+                    
+                    const transactionForType = transactions.find(t => t.category === category); 
+                    let barColorClass = 'bg-gray-500'; 
+                    if (transactionForType) { 
+                        if (transactionForType.type === 'Expense-Fixed') barColorClass = 'bg-red-500';
+                        else if (transactionForType.type === 'Expense-Variable') barColorClass = 'bg-pink-500';
+                    }
+
+                    innerBar.className = `${barColorClass} h-2.5 rounded-full transition-all duration-500`;
+                    const totalAllExpenses = Object.values(expensesByCategory).reduce((sum, val) => sum + val, 0);
+                    innerBar.style.width = totalAllExpenses > 0 ? `${(amount / totalAllExpenses) * 100}%` : '0%';
+                    
+                    barDivContainer.appendChild(innerBar);
+                    wrapper.appendChild(labelDiv);
+                    wrapper.appendChild(barDivContainer);
+                    breakdownContainer.appendChild(wrapper);
+                });
+
+            } else {
+                if(noExpensesPlaceholderEl) {
+                    noExpensesPlaceholderEl.classList.remove('hidden');
+                    noExpensesPlaceholderEl.textContent = currentLanguage === 'he' ? noExpensesPlaceholderEl.dataset.langHe : noExpensesPlaceholderEl.dataset.langEn;
+                }
+            }
+
+            if(fixedVariableRatioSpan) fixedVariableRatioSpan.textContent = `${currentCurrencySymbol}${totalFixed.toFixed(0)} / ${currentCurrencySymbol}${totalVariable.toFixed(0)}`;
+            if(fixedBarEl) fixedBarEl.style.width = `${totalFixed + totalVariable > 0 ? (totalFixed / (totalFixed + totalVariable) * 100) : 0}%`;
+            if(variableBarEl) variableBarEl.style.width = `${totalFixed + totalVariable > 0 ? (totalVariable / (totalFixed + totalVariable) * 100) : 0}%`;
+        }
+        
+        const chartColors = [
+            '#3b82f6', '#10b981', '#ef4444', '#f97316', '#8b5cf6', '#ec4899', 
+            '#6366f1', '#22d3ee', '#facc15', '#a3e63e', '#fb923c', '#c084fc'
+        ];
+
+        function updateCharts(filteredTrans) {
+            const isDarkMode = document.documentElement.classList.contains('dark');
+            const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            const labelColor = isDarkMode ? '#e5e7eb' : '#1f2937';
+
+            const monthlySummaries = {};
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5); 
+            sixMonthsAgo.setDate(1);
+            sixMonthsAgo.setHours(0,0,0,0);
+
+            transactions.forEach(t => { 
+                const date = new Date(t.date);
+                 date.setHours(0,0,0,0); 
+                if (date >= sixMonthsAgo) {
+                    const monthYear = date.toLocaleString(currentLanguage === 'he' ? 'he-IL' : 'en-US', { month: 'short', year: 'numeric' });
+                    if (!monthlySummaries[monthYear]) {
+                        monthlySummaries[monthYear] = { income: 0, expenses: 0, dateObj: new Date(date.getFullYear(), date.getMonth(), 1) };
+                    }
+                    if (t.type === 'Income') monthlySummaries[monthYear].income += t.amount;
+                    else if (t.type.includes('Expense')) monthlySummaries[monthYear].expenses += t.amount;
+                }
+            });
+            
+            const sortedSummaries = Object.values(monthlySummaries).sort((a,b) => a.dateObj - b.dateObj);
+            const trendLabels = sortedSummaries.map(s => s.dateObj.toLocaleString(currentLanguage === 'he' ? 'he-IL' : 'en-US', { month: 'short', year: 'numeric' }));
+            const trendIncomeData = sortedSummaries.map(s => s.income);
+            const trendExpenseData = sortedSummaries.map(s => s.expenses);
+
+
+            if (spendingTrendChart) spendingTrendChart.destroy();
+            spendingTrendChart = new Chart(document.getElementById('spendingTrendChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: trendLabels,
+                    datasets: [
+                        { label: currentLanguage === 'he' ? 'הכנסות' : 'Income', data: trendIncomeData, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.1, fill: true },
+                        { label: currentLanguage === 'he' ? 'הוצאות' : 'Expenses', data: trendExpenseData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.1, fill: true }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { 
+                    y: { ticks: { color: labelColor, callback: function(value) { return currentCurrencySymbol + value; } }, grid: { color: gridColor } }, 
+                    x: { ticks: { color: labelColor }, grid: { display: false } } 
+                }, plugins: { legend: { labels: { color: labelColor } }, tooltip: { callbacks: { label: function(context) { return `${context.dataset.label}: ${currentCurrencySymbol}${context.parsed.y.toFixed(2)}`;} } } } }
+            });
+
+            const incomeByCat = filteredTrans.filter(t => t.type === 'Income').reduce((acc, curr) => {
+                acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+                return acc;
+            }, {});
+            const incomeLabels = Object.keys(incomeByCat);
+            const incomeData = Object.values(incomeByCat);
+            const incomeLegend = document.getElementById('incomeLegend');
+            incomeLegend.innerHTML = '';
+
+            if (incomeLabels.length > 0) {
+                incomeLabels.forEach((label, index) => {
+                    const catDefinition = categories.income.find(c => c.value === label);
+                    const categoryName = catDefinition ? (currentLanguage === 'he' ? catDefinition.textHe : catDefinition.textEn) : label;
+                    const amount = incomeData[index];
+                    const color = categoryColors[label] || chartColors[index % chartColors.length];
+                    
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center';
+                    item.innerHTML = `<div class="w-3 h-3 rounded-full mr-2" style="background-color: ${color};"></div> <span>${categoryName}: ${currentCurrencySymbol}${amount.toFixed(2)}</span>`;
+                    incomeLegend.appendChild(item);
+                });
+            } else {
+                incomeLegend.innerHTML = `<p class="text-gray-500 dark:text-gray-400">${currentLanguage === 'he' ? 'אין נתוני הכנסה.' : 'No income data.'}</p>`;
+            }
+
+
+            if (incomePieChart) incomePieChart.destroy();
+            incomePieChart = new Chart(document.getElementById('incomePieChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: incomeLabels.map(label => {
+                        const catDefinition = categories.income.find(c => c.value === label);
+                        return catDefinition ? (currentLanguage === 'he' ? catDefinition.textHe : catDefinition.textEn) : label;
+                    }),
+                    datasets: [{ data: incomeData, backgroundColor: incomeLabels.map((label, index) => categoryColors[label] || chartColors[index % chartColors.length]), borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return `${context.label}: ${currentCurrencySymbol}${context.parsed.toFixed(2)}`;} } } } }
+            });
+
+            const expensesByCat = filteredTrans.filter(t => t.type.includes('Expense')).reduce((acc, curr) => {
+                acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+                return acc;
+            }, {});
+            const expenseLabels = Object.keys(expensesByCat);
+            const expenseData = Object.values(expensesByCat);
+            const expenseLegend = document.getElementById('expenseLegend');
+            expenseLegend.innerHTML = '';
+
+            if (expenseLabels.length > 0) {
+                 expenseLabels.forEach((label, index) => {
+                    const catDefinition = [...categories.fixedExpense, ...categories.variableExpense].find(c => c.value === label);
+                    const categoryName = catDefinition ? (currentLanguage === 'he' ? catDefinition.textHe : catDefinition.textEn) : label;
+                    const amount = expenseData[index];
+                    const color = categoryColors[label] || chartColors[index % chartColors.length];
+                    
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center';
+                    item.innerHTML = `<div class="w-3 h-3 rounded-full mr-2" style="background-color: ${color};"></div> <span>${categoryName}: ${currentCurrencySymbol}${amount.toFixed(2)}</span>`;
+                    expenseLegend.appendChild(item);
+                });
+            } else {
+                 expenseLegend.innerHTML = `<p class="text-gray-500 dark:text-gray-400">${currentLanguage === 'he' ? 'אין נתוני הוצאה.' : 'No expense data.'}</p>`;
+            }
+
+
+            if (expensePieChart) expensePieChart.destroy();
+            expensePieChart = new Chart(document.getElementById('expensePieChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: expenseLabels.map(label => {
+                         const catDefinition = [...categories.fixedExpense, ...categories.variableExpense].find(c => c.value === label);
+                         return catDefinition ? (currentLanguage === 'he' ? catDefinition.textHe : catDefinition.textEn) : label;
+                    }),
+                    datasets: [{ data: expenseData, backgroundColor: expenseLabels.map((label, index) => categoryColors[label] || chartColors[index % chartColors.length]), borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return `${context.label}: ${currentCurrencySymbol}${context.parsed.toFixed(2)}`;} } } } }
+            });
+        }
+        
+        function updateAllSummariesAndCharts() {
+            const filtered = getFilteredTransactions();
+            updateDashboardSummaries(filtered);
+            updateCharts(filtered);
+        }
+
+        // --- CSV Import/Export ---
+        importCsvBtn.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const csvData = e.target.result;
+                        const lines = csvData.split(/\r\n|\n/);
+                        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                        const importedTransactions = [];
+
+                        const headerMapping = {
+                            'date': 'date', 'type': 'type', 'category': 'category', 
+                            'amount': 'amount', 'method': 'method', 'shared': 'shared', 
+                            'partner': 'partner', 'notes': 'notes'
+                        };
+                        
+                        const headerIndices = {};
+                        Object.keys(headerMapping).forEach(key => {
+                            headerIndices[key] = headers.indexOf(key);
+                        });
+
+                        for (let i = 1; i < lines.length; i++) {
+                            if (!lines[i]) continue; 
+                            const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, '')); 
+                            const transaction = { id: Date.now().toString() + i }; 
+
+                            let validRow = true;
+                            Object.keys(headerMapping).forEach(key => {
+                                const index = headerIndices[key];
+                                if (index !== -1 && values[index] !== undefined) {
+                                    let value = values[index];
+                                    if (key === 'amount') value = parseFloat(value);
+                                    else if (key === 'shared') value = value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === 'yes';
+                                    transaction[headerMapping[key]] = value;
+                                } else if (key === 'date' || key === 'type' || key === 'category' || key === 'amount') {
+                                    console.warn(`Missing required header or value for "${key}" in CSV row ${i+1}. Skipping row.`);
+                                    validRow = false;
+                                } else {
+                                    if (key === 'shared') transaction[headerMapping[key]] = false;
+                                    else transaction[headerMapping[key]] = '';
+                                }
+                            });
+                            if(validRow && !isNaN(transaction.amount)) { 
+                                importedTransactions.push(transaction);
+                            } else if (validRow && isNaN(transaction.amount)) {
+                                console.warn(`Invalid amount for transaction in CSV row ${i+1}. Skipping row.`);
+                            }
+                        }
+                        
+                        if (importedTransactions.length > 0) {
+                            transactions.push(...importedTransactions);
+                            saveTransactions();
+                            populateMonthFilter(); 
+                            filterMonthSelect.value = "all"; 
+                            currentPage = 1;
+                            renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+                            updateAllSummariesAndCharts();
+                            console.log(currentLanguage === 'he' ? `${importedTransactions.length} עסקאות יובאו בהצלחה.` : `${importedTransactions.length} transactions imported successfully.`);
+                        } else {
+                             console.log(currentLanguage === 'he' ? 'לא נמצאו עסקאות תקינות לייבוא בקובץ ה-CSV.' : 'No valid transactions found to import in the CSV file.');
+                        }
+                    } catch (error) {
+                        console.error("Error importing CSV:", error);
+                         console.log(currentLanguage === 'he' ? 'שגיאה בעיבוד קובץ CSV.' : 'Error processing CSV file.');
+                    }
+                };
+                reader.readAsText(file);
+                importCsvBtn.value = null; 
+            }
+        });
+
+        exportCsvBtn.addEventListener('click', () => {
+            if (transactions.length === 0) {
+                console.log(currentLanguage === 'he' ? 'אין עסקאות לייצוא.' : 'No transactions to export.');
+                return;
+            }
+            const headers = ['Date', 'Type', 'Category', 'Amount', 'Method', 'Shared', 'Partner', 'Notes'];
+            const csvRows = [headers.join(',')];
+
+            getFilteredTransactions().forEach(t => { 
+                const row = [
+                    t.date, t.type, t.category, t.amount, t.method, 
+                    t.shared, t.partner || '', `"${(t.notes || '').replace(/"/g, '""')}"` 
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvString = csvRows.join('\r\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'transactions.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+        
+        // --- AI Features ---
+        async function callGeminiAPI(promptText, isJsonOutput = false) {
+            let chatHistory = [{ role: "user", parts: [{ text: promptText }] }];
+            const payload = { contents: chatHistory };
+            
+            if (isJsonOutput) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: { 
+                        type: "OBJECT",
+                        properties: {
+                            "transactionType": { "type": "STRING", "enum": ["Income", "Expense-Fixed", "Expense-Variable"] },
+                            "category": { "type": "STRING", "enum": allCategoryValues } 
+                        },
+                        required: ["transactionType", "category"]
+                    }
+                };
+            }
+
+            let apiKeyToUse = localStorage.getItem(API_KEY_STORAGE_ID);
+            if (!apiKeyToUse) { 
+                apiKeyToUse = ""; 
+            }
+            
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKeyToUse}`;
+            
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("Gemini API Error:", errorData);
+                throw new Error(`API request failed: ${errorData.error?.message || response.status}`);
+            }
+            
+            const result = await response.json();
+
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                const rawText = result.candidates[0].content.parts[0].text;
+                if (isJsonOutput) {
+                    try {
+                        return JSON.parse(rawText);
+                    } catch (e) {
+                        console.error("Error parsing JSON from Gemini:", e, "Raw text:", rawText);
+                        throw new Error("AI response was not valid JSON.");
+                    }
+                }
+                return rawText;
+            } else {
+                console.warn("Gemini API response structure unexpected or empty:", result);
+                throw new Error("No content in API response or unexpected structure.");
+            }
+        }
+
+        suggestCategoryBtn.addEventListener('click', async () => {
+            const notes = document.getElementById('transactionNotes').value;
+            if (!notes.trim()) {
+                alert(currentLanguage === 'he' ? 'אנא הזן הערות כדי לקבל הצעה.' : 'Please enter notes to get a suggestion.');
+                return;
+            }
+
+            suggestCategoryBtn.disabled = true;
+            suggestCategoryLoading.classList.remove('hidden');
+
+            const prompt = `
+                Based on the transaction note: "${notes}", suggest a transaction type and category.
+                Valid transaction types are: "Income", "Expense-Fixed", "Expense-Variable".
+                Valid categories are: ${allCategoryValues.join(", ")}.
+                Respond ONLY with a valid JSON object with keys "transactionType" and "category".
+                For example: {"transactionType": "Expense-Variable", "category": "Groceries"}
+            `;
+            try {
+                const suggestion = await callGeminiAPI(prompt, true); 
+                if (suggestion && suggestion.transactionType && suggestion.category) {
+                    if (["Income", "Expense-Fixed", "Expense-Variable"].includes(suggestion.transactionType) &&
+                        allCategoryValues.includes(suggestion.category)) {
+                        document.getElementById('transactionType').value = suggestion.transactionType;
+                        populateCategoryDropdown(suggestion.transactionType, 'transactionCategory'); 
+                        document.getElementById('transactionCategory').value = suggestion.category;
+                    } else {
+                        console.warn("AI suggestion contained invalid type or category:", suggestion);
+                        alert(currentLanguage === 'he' ? 'ה-AI הציע סוג או קטגוריה לא חוקיים.' : 'AI suggested an invalid type or category.');
+                    }
+                } else {
+                    console.warn("AI suggestion was not in the expected format or missing fields:", suggestion);
+                    alert(currentLanguage === 'he' ? 'ההצעה מה-AI לא הייתה בפורמט הצפוי.' : 'AI suggestion was not in the expected format.');
+                }
+            } catch (error) {
+                console.error('Error getting category suggestion:', error);
+                alert(currentLanguage === 'he' ? `שגיאה בקבלת הצעת קטגוריה: ${error.message}` : `Error getting category suggestion: ${error.message}`);
+            } finally {
+                suggestCategoryBtn.disabled = false;
+                suggestCategoryLoading.classList.add('hidden');
+            }
+        });
+
+        generateNoteBtn.addEventListener('click', async () => {
+            const category = document.getElementById('transactionCategory').value;
+            const amount = document.getElementById('transactionAmount').value;
+
+            if (!category || !amount) {
+                alert(currentLanguage === 'he' ? 'אנא בחר קטגוריה והזן סכום כדי ליצור הערה.' : 'Please select a category and enter an amount to generate a note.');
+                return;
+            }
+            generateNoteBtn.disabled = true;
+            generateNoteLoading.classList.remove('hidden');
+            
+            const categoryText = document.getElementById('transactionCategory').selectedOptions[0].text;
+
+            const prompt = `
+                Generate a brief, natural-sounding transaction note.
+                The transaction category is "${categoryText}" and the amount is ${currentCurrencySymbol}${amount}.
+                The current language is ${currentLanguage === 'he' ? 'Hebrew' : 'English'}. Respond ONLY in that language.
+                Keep it concise, like something a person would quickly type (max 10 words).
+                For example, if category is "Groceries" and amount is ${currentCurrencySymbol}50, a good note could be "Weekly groceries" or "Milk, eggs, bread".
+                If category is "Salary", a note could be "Monthly paycheck".
+            `;
+            try {
+                const noteSuggestion = await callGeminiAPI(prompt);
+                document.getElementById('transactionNotes').value = noteSuggestion.trim();
+            } catch (error) {
+                console.error('Error generating note:', error);
+                alert(currentLanguage === 'he' ? `שגיאה ביצירת הערה: ${error.message}` : `Error generating note: ${error.message}`);
+            } finally {
+                generateNoteBtn.disabled = false;
+                generateNoteLoading.classList.add('hidden');
+            }
+        });
+        
+        analyzeFinancesBtn.addEventListener('click', async () => {
+            aiAnalysisResultDiv.innerHTML = '';
+            aiAnalysisPlaceholder.classList.add('hidden');
+            aiLoadingIndicator.classList.remove('hidden');
+            analyzeFinancesBtn.disabled = true;
+
+            const currentMonthTransactions = getFilteredTransactions(); 
+            if (currentMonthTransactions.length === 0) {
+                aiAnalysisResultDiv.innerHTML = `<p class="text-sm text-orange-600">${currentLanguage === 'he' ? 'אין נתונים לניתוח עבור התקופה שנבחרה.' : 'No data to analyze for the selected period.'}</p>`;
+                aiLoadingIndicator.classList.add('hidden');
+                analyzeFinancesBtn.disabled = false;
+                return;
+            }
+
+            const summary = {
+                totalIncome: currentMonthTransactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0),
+                totalExpenses: currentMonthTransactions.filter(t => t.type.includes('Expense')).reduce((sum, t) => sum + t.amount, 0),
+                expensesByCategory: currentMonthTransactions.filter(t => t.type.includes('Expense')).reduce((acc, t) => {
+                    acc[t.category] = (acc[t.category] || 0) + t.amount;
+                    return acc;
+                }, {}),
+                incomeBySource: currentMonthTransactions.filter(t => t.type === 'Income').reduce((acc, t) => {
+                    acc[t.category] = (acc[t.category] || 0) + t.amount;
+                    return acc;
+                }, {})
+            };
+            summary.netBalance = summary.totalIncome - summary.totalExpenses;
+            summary.savingsRate = summary.totalIncome > 0 ? (summary.netBalance / summary.totalIncome * 100).toFixed(1) + '%' : 'N/A';
+
+            const selectedMonthName = filterMonthSelect.options[filterMonthSelect.selectedIndex].text;
+
+            const prompt = `
+                Analyze the following financial data for ${selectedMonthName}. The currency is ${currentCurrencyCode}.
+                Provide a concise summary (2-3 sentences) and 2-3 actionable insights or suggestions for improvement.
+                Keep the language simple and encouraging.
+                The user's current interface language is ${currentLanguage === 'he' ? 'Hebrew' : 'English'}. Respond ONLY in that language.
+
+                Financial Summary:
+                - Total Income: ${currentCurrencySymbol}${summary.totalIncome.toFixed(2)}
+                - Total Expenses: ${currentCurrencySymbol}${summary.totalExpenses.toFixed(2)}
+                - Net Balance: ${currentCurrencySymbol}${summary.netBalance.toFixed(2)}
+                - Savings Rate: ${summary.savingsRate}
+                - Top 3 Expense Categories: ${Object.entries(summary.expensesByCategory).sort(([,a],[,b]) => b-a).slice(0,3).map(([cat,amo]) => `${cat}: ${currentCurrencySymbol}${amo.toFixed(2)}`).join(', ') || 'None'}
+                - Income Sources: ${Object.entries(summary.incomeBySource).map(([cat,amo]) => `${cat}: ${currentCurrencySymbol}${amo.toFixed(2)}`).join(', ') || 'None'}
+            `;
+
+            try {
+                const analysisText = await callGeminiAPI(prompt);
+                const pre = document.createElement('pre');
+                pre.textContent = analysisText;
+                aiAnalysisResultDiv.appendChild(pre);
+            } catch (error) {
+                console.error('Error fetching AI analysis:', error);
+                aiAnalysisResultDiv.innerHTML = `<p class="text-sm text-red-600">${currentLanguage === 'he' ? 'שגיאה בקבלת ניתוח AI. אנא נסה שוב מאוחר יותר.' : 'Error fetching AI analysis. Please try again later.'} Details: ${error.message}</p>`;
+            } finally {
+                aiLoadingIndicator.classList.add('hidden');
+                analyzeFinancesBtn.disabled = false;
+            }
+        });
+
+
+        // --- Initialization ---
+        function initApp() {
+            loadInitialSettings(); 
+            loadTransactions();
+            populateMonthFilter(); 
+            
+            currentPage = 1;
+            const initialFilteredTransactions = getFilteredTransactions();
+            renderTransactions(getPaginatedTransactions(initialFilteredTransactions));
+            // updateAllSummariesAndCharts is called by loadInitialSettings after currency is set
+
+            filterMonthSelect.addEventListener('change', () => {
+                currentPage = 1; 
+                renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+                updateAllSummariesAndCharts();
+            });
+             document.getElementById('filterPaymentMethod').addEventListener('change', () => {
+                currentPage = 1;
+                renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+                updateAllSummariesAndCharts();
+            });
+            document.getElementById('filterCategory').addEventListener('change', () => {
+                currentPage = 1;
+                renderTransactions(getPaginatedTransactions(getFilteredTransactions()));
+                updateAllSummariesAndCharts();
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+
+    </script>
+</body>
+</html>
